@@ -996,8 +996,6 @@ input, select, textarea {
 <section class="reading-panel">
 <div class="reading-panel-inner" id="readingPanelInner">
 <h3>Use last reading</h3>
-<p class="reading-help">Enter Nadine's last glucose reading and this will suggest a sensible <em>next meal</em> direction — not treatment, just guidance on what to cook now.</p>
-<p class="reading-targets"><strong>ADA-style public targets used:</strong> fasting 70–95 mg/dL (3.9–5.3 mmol/L), 1-hour after meals <strong>under 140 mg/dL</strong> (7.8 mmol/L), and 2-hour after meals <strong>under 120 mg/dL</strong> (6.7 mmol/L). Borderline is treated deliberately: 1-hour 130–139, 2-hour 110–119, and fasting 90–95 are not called “normal”; they are shown as close-to-limit readings.</p>
 <form class="reading-form" id="readingForm">
 <div class="reading-row">
 <select class="reading-select" id="readingType">
@@ -1011,12 +1009,9 @@ input, select, textarea {
 </div>
 </div>
 <input aria-label="Glucose reading" class="reading-input" id="readingValue" inputmode="decimal" placeholder="e.g. 7.2" step="0.1" type="number"/>
-<button class="reading-submit" type="submit">Suggest a next meal</button>
+<button class="reading-submit" type="submit">Use reading</button>
 </form>
 <div class="reading-result" id="readingResult"></div>
-<div class="medical-guardrail">
-<strong>Medical guardrail.</strong> This uses ADA-style public guidance because that is the target system you selected. It suggests sensible next-meal patterns; it does not treat dangerous readings or replace Nadine's pregnancy and diabetes care team. Repeated out-of-target readings should be reviewed with her clinician — not corrected by an app.
-    </div>
 </div>
 </section>
 <div class="lane-banner" id="laneBanner">
@@ -1050,6 +1045,17 @@ input, select, textarea {
 <button class="chip" data-section="Soups" type="button">Soups</button>
 <button class="chip" data-section="Snacks" type="button">Snacks</button>
 <button class="chip" data-section="Sides and condiments" type="button">Sides</button>
+</div>
+<div class="section-filter" id="cuisineFilters" aria-label="Cuisine filters">
+<button class="chip active" data-cuisine-filter="all" type="button">All cuisines</button>
+<button class="chip" data-cuisine-filter="Italian" type="button">Italian</button>
+<button class="chip" data-cuisine-filter="Indian / South Asian" type="button">Indian / South Asian</button>
+<button class="chip" data-cuisine-filter="Thai" type="button">Thai</button>
+<button class="chip" data-cuisine-filter="Chinese" type="button">Chinese</button>
+<button class="chip" data-cuisine-filter="East African / Khoja" type="button">East African / Khoja</button>
+<button class="chip" data-cuisine-filter="Mexican" type="button">Mexican</button>
+<button class="chip" data-cuisine-filter="Middle Eastern / Mediterranean" type="button">Mediterranean</button>
+<button class="chip" data-cuisine-filter="Global" type="button">Global</button>
 </div>
 </section>
 <div aria-live="polite" class="result-count" id="resultCount"></div>
@@ -4136,15 +4142,6 @@ input, select, textarea {
   function loadStore() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
-      // Migrate from kitchen.v1 if present
-      if (!raw) {
-        var old = localStorage.getItem('kitchen.v1');
-        if (old) {
-          localStorage.setItem(STORAGE_KEY, old);
-          localStorage.removeItem('kitchen.v1');
-          raw = old;
-        }
-      }
       return raw ? JSON.parse(raw) : {};
     } catch(e) {
       storageOK = false;
@@ -4359,6 +4356,15 @@ input, select, textarea {
       applyFilters();
     });
   });
+  cuisineChips.forEach(function(c){
+    c.addEventListener('click', function(){
+      cuisineChips.forEach(function(x){ x.classList.remove('active'); });
+      c.classList.add('active');
+      store.cuisine = c.getAttribute('data-cuisine-filter');
+      saveStore(store);
+      applyFilters();
+    });
+  });
   applyFilters();
 
   // ---------- Hero buttons ----------
@@ -4452,18 +4458,18 @@ input, select, textarea {
 
     function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
     function resultBody(interpretation, nextMeal){
-      return 'Using ADA-style public guidance. ' + target.targetText + '. Your reading: ' + shown + '. Interpretation: ' + interpretation + '. Next meal direction: ' + nextMeal;
+      return 'Reading: ' + shown + '. ' + interpretation + '. Next meal: ' + nextMeal;
     }
 
     if (mg < 70) return {
       title: 'Low reading — not a recipe question',
-      body: resultBody('below 70 mg/dL, which is low blood sugar', 'follow her low-reading care plan for quick carbohydrate and recheck. Do not use this recipe app to correct a low.'),
+      body: resultBody('This is below 70 mg/dL and counts as low blood sugar', 'follow her low-reading care plan for quick carbohydrate and recheck. Do not use this recipe app to correct a low.'),
       lane: null, level: 'low'
     };
 
     if (mg >= 70 && mg < 75) return {
       title: 'Low-normal reading',
-      body: resultBody('above the low threshold but close to it', 'balanced, not ultra-low-carb — protein plus a measured slow carb if she is hungry.'),
+      body: resultBody('This is low-normal', 'balanced, not ultra-low-carb — protein plus a measured slow carb if she is hungry.'),
       lane: null, level: 'borderline'
     };
 
@@ -4472,8 +4478,8 @@ input, select, textarea {
 
     if (withinTarget && !borderlineInRange) {
       return {
-        title: cap(target.name) + ' reading is comfortably in range',
-        body: resultBody('comfortably in range', 'normal balanced meal is fine — protein, vegetables, and one measured starch if wanted. No reading-based filter is needed.'),
+        title: cap(target.name) + ' reading is Comfortably in range',
+        body: resultBody('Comfortably in range', 'normal balanced meal is fine — protein, vegetables, and one measured starch if wanted. No reading-based filter is needed.'),
         lane: null, level: 'in-range'
       };
     }
@@ -4481,8 +4487,8 @@ input, select, textarea {
     if (borderlineInRange) {
       return {
         title: cap(target.name) + ' reading is borderline but still within target',
-        body: resultBody('within target, but close enough to the upper limit that it should not be treated as simply “normal”', 'gentler meal — low-starch or controlled legume-based, no stacked carbs, no juice, no dessert.'),
-        lane: 'gentle', laneLabel: 'borderline lane: low-starch + controlled legume meals', level: 'borderline'
+        body: resultBody('Borderline but still within target', 'gentler meal — low-starch or controlled legume-based, no stacked carbs, no juice, no dessert.'),
+        lane: 'gentle', laneLabel: 'Borderline: lower-starch + controlled legume meals', level: 'borderline'
       };
     }
 
@@ -4490,23 +4496,23 @@ input, select, textarea {
     if (mg <= target.slightHighMax) {
       return {
         title: cap(target.name) + ' reading is slightly above target',
-        body: resultBody('above target by about ' + Math.round(aboveBy) + ' mg/dL', 'reset meal — protein and vegetables, no grain/tortilla/pasta/rice/fruit/juice/dessert. If repeating the prior dish, reduce the likely starch lever first.'),
-        lane: 'reset', laneLabel: 'reset lane: strict protein + vegetables; no grains, legumes, fruit, tortilla, pasta, or rice', level: 'high'
+        body: resultBody('Above target by about ' + Math.round(aboveBy) + ' mg/dL', 'reset meal — protein and vegetables, no grain/tortilla/pasta/rice/fruit/juice/dessert. If repeating the prior dish, reduce the likely starch lever first.'),
+        lane: 'reset', laneLabel: 'Reset: protein + vegetables only', level: 'high'
       };
     }
 
     if (mg <= target.highMax) {
       return {
         title: cap(target.name) + ' reading is high',
-        body: resultBody('clearly above target', 'strict reset meal if she is eating, log what happened, avoid stacked carbs, and follow the care plan if this repeats.'),
-        lane: 'reset', laneLabel: 'reset lane: strict protein + vegetables; no grains, legumes, fruit, tortilla, pasta, or rice', level: 'high'
+        body: resultBody('Clearly above target', 'strict reset meal if she is eating, log what happened, avoid stacked carbs, and follow the care plan if this repeats.'),
+        lane: 'reset', laneLabel: 'Reset: protein + vegetables only', level: 'high'
       };
     }
 
     return {
       title: cap(target.name) + ' reading is very high',
-      body: resultBody('well above target', 'do not try to “fix” this with a recipe. If she is eating, keep it very simple and low-starch, log it, and follow the clinical care plan / contact her care team if unexpected or repeated.'),
-      lane: 'reset', laneLabel: 'reset lane: strict protein + vegetables; no grains, legumes, fruit, tortilla, pasta, or rice', level: 'very-high'
+      body: resultBody('Well above target', 'do not try to “fix” this with a recipe. If she is eating, keep it very simple and low-starch, log it, and follow the clinical care plan / contact her care team if unexpected or repeated.'),
+      lane: 'reset', laneLabel: 'Reset: protein + vegetables only', level: 'very-high'
     };
   }
 
@@ -4547,13 +4553,21 @@ input, select, textarea {
     box.innerHTML = '';
     var h = document.createElement('h4'); h.textContent = advice.title; box.appendChild(h);
     var p = document.createElement('p'); p.textContent = advice.body; box.appendChild(p);
+
+    // The reading tool should act immediately, not ask the user to press another button.
+    // If the reading is invalid/low/in-range, clear any previous reading filter so stale suggestions do not stay active.
     if (advice.lane) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'apply';
-      b.textContent = advice.laneLabel ? 'Show those recipes' : 'Show recipes';
-      b.addEventListener('click', function(){ applyLane(advice.lane, advice.laneLabel); });
-      box.appendChild(b);
+      applyLane(advice.lane, advice.laneLabel);
+      var note = document.createElement('p');
+      note.textContent = 'Recipe list updated below.';
+      note.style.marginTop = '8px';
+      box.appendChild(note);
+    } else {
+      store.lane = null;
+      store.laneLabel = null;
+      saveStore(store);
+      updateLaneBanner();
+      applyFilters();
     }
   });
 
