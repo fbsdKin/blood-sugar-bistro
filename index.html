@@ -255,6 +255,94 @@ input, select, textarea {
   border: 1px solid var(--ink);
   color: var(--ink);
 }
+
+.recommended-recipes {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(31,27,22,0.10);
+}
+.recommended-recipes h5 {
+  font-family: "Iowan Old Style", Cambria, Georgia, ui-serif, serif;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--ink);
+}
+.rec-picks {
+  display: grid;
+  gap: 7px;
+}
+.rec-pick {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  display: block;
+  text-align: left;
+}
+.rec-pick strong {
+  display: block;
+  font-size: 13.5px;
+  line-height: 1.25;
+  color: var(--ink);
+  font-weight: 600;
+}
+.rec-pick span {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.rec-pick:active { transform: scale(0.99); }
+
+
+.reading-recs {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+.reading-recs-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--warm);
+  margin-top: 2px;
+}
+.reading-rec-card {
+  width: 100%;
+  display: grid;
+  gap: 3px;
+  padding: 12px 13px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  text-align: left;
+}
+.reading-rec-card strong {
+  font-family: "Iowan Old Style", Cambria, Georgia, ui-serif, serif;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+}
+.reading-rec-meta {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.reading-rec-reason {
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+.reading-rec-card:active {
+  transform: scale(0.99);
+}
+
 .medical-guardrail {
   margin-top: 12px;
   padding: 11px 14px;
@@ -4698,6 +4786,15 @@ input, select, textarea {
     return true;
   }
 
+  function cardMatchesLane(card, lane) {
+    if (!lane) return true;
+    var carb = card.getAttribute('data-carblevel');
+    if (lane === 'reset') return isResetMeal(card);
+    if (lane === 'strictlow' || lane === 'low') return carb === 'low';
+    if (lane === 'gentle') return carb === 'low' || carb === 'legume';
+    return true;
+  }
+
   function getFiltered() {
     var query = (searchInput.value || '').toLowerCase().trim();
     var filters = getActiveFilters();
@@ -4713,12 +4810,8 @@ input, select, textarea {
       // Reading lanes
       // reset: after an above-target reading = stricter low-starch reset meals only.
       // strictlow/low: low-starch recipes only.
-      // gentle: borderline = low-starch + legume-based slow-carb meals; excludes measured-starch meals.
-      // measured is kept only for old saved states and does not hide recipes.
-      var carb = card.getAttribute('data-carblevel');
-      if (lane === 'reset' && !isResetMeal(card)) return false;
-      if ((lane === 'strictlow' || lane === 'low') && carb !== 'low') return false;
-      if (lane === 'gentle' && !(carb === 'low' || carb === 'legume')) return false;
+      // gentle: borderline = low-starch + legume-based slow-carb meals; excludes measured-starch meals and Sweet Treats.
+      if (!cardMatchesLane(card, lane)) return false;
       // Quick filters (all must match)
       if (filters.length > 0) {
         var tags = (card.getAttribute('data-tags') || '').split(',');
@@ -4828,27 +4921,32 @@ input, select, textarea {
   });
   setUnit(store.unit);
 
-  function readingAdvice(type, val, unit){
+  
+function readingAdvice(type, val, unit){
     var MG_PER_MMOL = 18.0182;
+
     if (val === null || val === undefined || isNaN(val) || val <= 0) return {
-      title:'Add a valid number first',
-      body:'Enter Nadine\'s last reading and pick the timing. Use mg/dL or mmol/L consistently.',
-      lane:null,
-      level:'high'
+      title: "Let's add a reading first",
+      body: "Add your last reading, choose the timing, and I'll suggest a sensible next meal direction.",
+      lane: null,
+      recMode: null,
+      level: "borderline"
     };
 
     // Unit sanity checks before interpreting the result.
     if (unit === 'mmol' && val > 30) return {
-      title:'Unit looks wrong',
-      body:'You entered ' + val + ' mmol/L, which looks like a mg/dL number. Switch the unit to mg/dL before interpreting it. Do not use a recipe suggestion from a unit-mismatched reading.',
-      lane:null,
-      level:'very-high'
+      title: "This looks like the wrong unit",
+      body: "That number looks like mg/dL, not mmol/L. Switch the unit first so the suggestion is based on the right reading.",
+      lane: null,
+      recMode: null,
+      level: "very-high"
     };
     if (unit === 'mgdl' && val < 30) return {
-      title:'Unit looks wrong',
-      body:'You entered ' + val + ' mg/dL, which looks like a mmol/L number. Switch the unit to mmol/L before interpreting it. Do not use a recipe suggestion from a unit-mismatched reading.',
-      lane:null,
-      level:'very-high'
+      title: "This looks like the wrong unit",
+      body: "That number looks like mmol/L, not mg/dL. Switch the unit first so the suggestion is based on the right reading.",
+      lane: null,
+      recMode: null,
+      level: "very-high"
     };
 
     var mg = unit === 'mmol' ? val * MG_PER_MMOL : val;
@@ -4858,38 +4956,25 @@ input, select, textarea {
     var shown = roundedMg + ' mg/dL (' + roundedMmol + ' mmol/L)';
 
     var target = {
-      fasting: {
-        name:'fasting', upper:95, inclusive:true,
-        targetText:'ADA-style fasting target: 70–95 mg/dL (3.9–5.3 mmol/L)',
-        borderlineStart:90, slightHighMax:105, highMax:125
-      },
-      onehour: {
-        name:'1-hour', upper:140, inclusive:false,
-        targetText:'ADA-style 1-hour target: under 140 mg/dL (7.8 mmol/L)',
-        borderlineStart:130, slightHighMax:154, highMax:179
-      },
-      twohour: {
-        name:'2-hour', upper:120, inclusive:false,
-        targetText:'ADA-style 2-hour target: under 120 mg/dL (6.7 mmol/L)',
-        borderlineStart:110, slightHighMax:134, highMax:159
-      }
+      fasting: { name:'fasting', upper:95, inclusive:true, borderlineStart:90, slightHighMax:105, highMax:125 },
+      onehour: { name:'1-hour', upper:140, inclusive:false, borderlineStart:130, slightHighMax:154, highMax:179 },
+      twohour: { name:'2-hour', upper:120, inclusive:false, borderlineStart:110, slightHighMax:134, highMax:159 }
     }[type];
 
-    function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
     function resultBody(interpretation, nextMeal){
-      return 'Reading: ' + shown + '. ' + interpretation + '. Next meal: ' + nextMeal;
+      return 'Reading: ' + shown + '. ' + interpretation + ' ' + nextMeal;
     }
 
     if (mg < 70) return {
-      title: 'Low reading — not a recipe question',
-      body: resultBody('This is below 70 mg/dL and counts as low blood sugar', 'follow her low-reading care plan for quick carbohydrate and recheck. Do not use this recipe app to correct a low.'),
-      lane: null, level: 'low'
+      title: "This looks low",
+      body: resultBody("This is below 70 mg/dL, so this is not a recipe-choice moment.", "Follow your low-reading plan from the care team, recheck as instructed, and use this app for meal ideas once things are steady again."),
+      lane: null, recMode: null, level: "low"
     };
 
     if (mg >= 70 && mg < 75) return {
-      title: 'Low-normal reading',
-      body: resultBody('This is low-normal', 'balanced, not ultra-low-carb — protein plus a measured slow carb if she is hungry.'),
-      lane: null, level: 'borderline'
+      title: "This is a touch on the low side",
+      body: resultBody("It is not a high reading, but it is close to the low end.", "For the next meal, do not go ultra-low-carb: choose protein plus a measured slow carb if you are hungry."),
+      lane: null, recMode: "low-normal", level: "borderline"
     };
 
     var withinTarget = target.inclusive ? (mg <= target.upper) : (mg < target.upper);
@@ -4897,41 +4982,41 @@ input, select, textarea {
 
     if (withinTarget && !borderlineInRange) {
       return {
-        title: cap(target.name) + ' reading is Comfortably in range',
-        body: resultBody('Comfortably in range', 'normal balanced meal is fine — protein, vegetables, and one measured starch if wanted. No reading-based filter is needed.'),
-        lane: null, level: 'in-range'
+        title: "Beautiful — this is comfortably in range",
+        body: resultBody("This is comfortably within the ADA-style target.", "For the next meal, keep it flexible and balanced: protein, vegetables, and one measured carb if wanted."),
+        lane: null, recMode: "open", level: "in-range"
       };
     }
 
     if (borderlineInRange) {
       return {
-        title: cap(target.name) + ' reading is borderline but still within target',
-        body: resultBody('Borderline but still within target', 'gentler meal — low-starch or controlled legume-based, no stacked carbs, no juice, no dessert.'),
-        lane: 'gentle', laneLabel: 'Borderline: lower-starch + controlled legume meals', level: 'borderline'
+        title: "Close to the line, but still within target",
+        body: resultBody("This is still within the ADA-style target, just closer to the limit than we would like.", "For the next meal, choose something steady: protein and vegetables first, with either no starch or one controlled slow carb. No dessert for this round."),
+        lane: "gentle", laneLabel: "Borderline: lower-starch + controlled legume meals", recMode: "gentle", level: "borderline"
       };
     }
 
-    var aboveBy = mg - target.upper;
+    var aboveBy = Math.max(0, mg - target.upper);
     if (mg <= target.slightHighMax) {
       return {
-        title: cap(target.name) + ' reading is slightly above target',
-        body: resultBody('Above target by about ' + Math.round(aboveBy) + ' mg/dL', 'reset meal — protein and vegetables, no grain/tortilla/pasta/rice/fruit/juice/dessert. If repeating the prior dish, reduce the likely starch lever first.'),
-        lane: 'reset', laneLabel: 'Reset: protein + vegetables only', level: 'high'
+        title: "Looks like this one came in a bit higher than we would like",
+        body: resultBody("This is above the ADA-style target by about " + Math.round(aboveBy) + " mg/dL.", "For the next meal, keep it steady: protein plus non-starchy vegetables, with no rice, pasta, bread, tortilla, oats, fruit, juice, or dessert for now."),
+        lane: "reset", laneLabel: "Reset: protein + vegetables only", recMode: "reset", level: "high"
       };
     }
 
     if (mg <= target.highMax) {
       return {
-        title: cap(target.name) + ' reading is high',
-        body: resultBody('Clearly above target', 'strict reset meal if she is eating, log what happened, avoid stacked carbs, and follow the care plan if this repeats.'),
-        lane: 'reset', laneLabel: 'Reset: protein + vegetables only', level: 'high'
+        title: "This one is higher than we would want",
+        body: resultBody("This is clearly above the ADA-style target.", "For the next meal, keep it very simple and steady: protein, non-starchy vegetables, water, and no extra carbs for now. If this repeats, follow the care plan or check with the care team."),
+        lane: "reset", laneLabel: "Reset: protein + vegetables only", recMode: "reset", level: "high"
       };
     }
 
     return {
-      title: cap(target.name) + ' reading is very high',
-      body: resultBody('Well above target', 'do not try to “fix” this with a recipe. If she is eating, keep it very simple and low-starch, log it, and follow the clinical care plan / contact her care team if unexpected or repeated.'),
-      lane: 'reset', laneLabel: 'Reset: protein + vegetables only', level: 'very-high'
+      title: "This one is higher than we would like, so let’s keep things steady",
+      body: resultBody("This is well above the ADA-style target; this is not about blame, and one perfect meal will not magically fix the number.", "For the next meal, choose a simple low-starch option: protein, non-starchy vegetables, water, and no dessert or extra carbs. If this is unexpected or repeated, follow the care plan or contact the care team."),
+      lane: "reset", laneLabel: "Reset: protein + vegetables only", recMode: "reset", level: "very-high"
     };
   }
 
@@ -4950,9 +5035,6 @@ input, select, textarea {
     saveStore(store);
     updateLaneBanner();
     applyFilters();
-    setTimeout(function(){
-      $('#resultCount').scrollIntoView({behavior:'smooth', block:'start'});
-    }, 50);
   }
   $('#clearLane').addEventListener('click', function(){
     store.lane = null; store.laneLabel = null;
@@ -4961,6 +5043,191 @@ input, select, textarea {
     applyFilters();
   });
   updateLaneBanner();
+
+  function recipeWhyText(card){
+    var blocks = card.querySelectorAll('.gd-block');
+    for (var i = 0; i < blocks.length; i++) {
+      var label = blocks[i].querySelector('.gd-label');
+      if (label && label.textContent.toLowerCase().indexOf('why') !== -1) {
+        var p = blocks[i].querySelector('p');
+        if (p) return p.textContent.trim();
+      }
+    }
+    var title = card.querySelector('.recipe-title');
+    return title ? title.textContent.trim() : 'Good fit for this reading.';
+  }
+
+  function trimReason(text){
+    text = (text || '').replace(/\s+/g, ' ').trim();
+    var firstSentence = text.split('. ')[0];
+    if (firstSentence.length < 45 && text.indexOf('. ') !== -1) firstSentence = text.split('. ').slice(0, 2).join('. ');
+    if (firstSentence.length > 125) firstSentence = firstSentence.slice(0, 122).replace(/\s+\S*$/, '') + '…';
+    return firstSentence.replace(/\.$/, '') + '.';
+  }
+
+  function cardPriorityForReading(card, type, mode){
+    var score = 0;
+    var section = card.getAttribute('data-section') || '';
+    var carb = card.getAttribute('data-carblevel') || '';
+    var tags = (card.getAttribute('data-tags') || '').split(',');
+
+    if (type === 'fasting') {
+      if (section === 'Breakfasts') score += 110;
+      if (section === 'Quick lunches') score += 35;
+      if (section === 'Sweet Treats') score -= 80;
+    } else {
+      if (section === 'Quick lunches') score += 80;
+      if (section === 'Quick weeknight dinners') score += 75;
+      if (section === 'Proper dinners') score += 55;
+      if (section === 'Soups') score += 35;
+      if (section === 'Breakfasts') score -= 25;
+      if (section === 'Sweet Treats') score += (mode === 'open' ? 10 : -120);
+    }
+
+    if (mode === 'reset') {
+      if (isResetMeal(card)) score += 90;
+      if (carb === 'low') score += 25;
+      if (tags.indexOf('Quick') !== -1) score += 12;
+      if (tags.indexOf('Fish/seafood') !== -1 || tags.indexOf('Eggs') !== -1) score += 10;
+    } else if (mode === 'gentle') {
+      if (carb === 'low') score += 55;
+      if (carb === 'legume') score += 25;
+      if (tags.indexOf('Quick') !== -1) score += 8;
+      if (carb === 'measured' || carb === 'sweet') score -= 120;
+    } else if (mode === 'low-normal') {
+      if (carb === 'measured') score += 45;
+      if (carb === 'legume') score += 30;
+      if (carb === 'low') score += 18;
+      if (carb === 'sweet') score -= 80;
+    } else {
+      if (carb === 'measured') score += 35;
+      if (carb === 'low') score += 30;
+      if (carb === 'legume') score += 28;
+      if (carb === 'sweet') score += (type === 'fasting' ? -45 : 22);
+      if (section === 'Sweet Treats' && type !== 'fasting') score += 10;
+    }
+
+    if (tags.indexOf('Eggs') !== -1 && type === 'fasting') score += 18;
+    if (tags.indexOf('Quick') !== -1) score += 6;
+    if (section === 'Sides and condiments') score -= 120;
+
+    var id = card.getAttribute('data-id') || '';
+    var hash = 0;
+    for (var i = 0; i < id.length; i++) hash = (hash + id.charCodeAt(i) * (i + 3)) % 97;
+    score += hash / 100;
+    return score;
+  }
+
+  function cardAllowedForRecommendation(card, mode, type){
+    var section = card.getAttribute('data-section') || '';
+    var carb = card.getAttribute('data-carblevel') || '';
+    if (section === 'Sides and condiments') return false;
+    if (mode !== 'open' && section === 'Sweet Treats') return false;
+    if (mode === 'open' && type === 'fasting' && section === 'Sweet Treats') return false;
+    if (mode === 'reset') return isResetMeal(card);
+    if (mode === 'gentle') return (carb === 'low' || carb === 'legume');
+    if (mode === 'low-normal') return (carb === 'measured' || carb === 'legume' || carb === 'low');
+    return true;
+  }
+
+  function recommendedCardsForAdvice(advice, type){
+    var mode = advice.recMode || advice.lane || null;
+    if (!mode) return [];
+
+    var candidates = allCards.filter(function(card){
+      return cardAllowedForRecommendation(card, mode, type);
+    }).map(function(card){
+      return { card: card, score: cardPriorityForReading(card, type, mode) };
+    }).sort(function(a,b){ return b.score - a.score; });
+
+    var picked = [];
+    var usedSections = {};
+    var usedCuisines = {};
+
+    function tryPick(requireDifferent){
+      for (var i = 0; i < candidates.length && picked.length < 3; i++) {
+        var card = candidates[i].card;
+        if (picked.indexOf(card) !== -1) continue;
+        var section = card.getAttribute('data-section') || '';
+        var cuisine = card.getAttribute('data-cuisine') || '';
+        if (requireDifferent && picked.length > 0 && (usedSections[section] || usedCuisines[cuisine])) continue;
+        picked.push(card);
+        usedSections[section] = true;
+        usedCuisines[cuisine] = true;
+      }
+    }
+
+    if (mode === 'open' && type !== 'fasting') {
+      tryPick(true);
+      var hasSweet = picked.some(function(c){ return c.getAttribute('data-section') === 'Sweet Treats'; });
+      if (!hasSweet && picked.length >= 2) {
+        var sweet = candidates.map(function(x){ return x.card; }).filter(function(c){ return c.getAttribute('data-section') === 'Sweet Treats'; })[0];
+        if (sweet) picked[2] = sweet;
+      }
+    } else {
+      tryPick(true);
+    }
+
+    if (picked.length < 3) tryPick(false);
+    return picked.slice(0, 3);
+  }
+
+  function renderRecommendations(box, cards){
+    if (!cards || cards.length === 0) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'reading-recs';
+    var label = document.createElement('div');
+    label.className = 'reading-recs-title';
+    label.textContent = 'Three good next options';
+    wrap.appendChild(label);
+
+    cards.forEach(function(card){
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'reading-rec-card';
+      btn.setAttribute('data-rec-id', card.getAttribute('data-id'));
+      var title = (card.querySelector('.recipe-title') || {}).textContent || card.getAttribute('data-title') || 'Recipe';
+      var meta = (card.getAttribute('data-section') || '') + ' · ' + (card.getAttribute('data-cuisine') || '');
+      btn.innerHTML = '<strong></strong><span class="reading-rec-meta"></span><span class="reading-rec-reason"></span>';
+      btn.querySelector('strong').textContent = title;
+      btn.querySelector('.reading-rec-meta').textContent = meta;
+      btn.querySelector('.reading-rec-reason').textContent = trimReason(recipeWhyText(card));
+      wrap.appendChild(btn);
+    });
+    box.appendChild(wrap);
+  }
+
+  function resetBrowseFiltersForRecommendation(){
+    searchInput.value = '';
+    quickChips.forEach(function(c){ c.classList.remove('active'); });
+    sectionChips.forEach(function(c){ c.classList.toggle('active', c.getAttribute('data-section') === 'all'); });
+    cuisineChips.forEach(function(c){ c.classList.toggle('active', c.getAttribute('data-cuisine-filter') === 'all'); });
+    store.quickFilters = [];
+    store.section = 'all';
+    store.cuisine = 'all';
+    saveStore(store);
+  }
+
+  function openRecommendedRecipe(id){
+    var card = document.querySelector('.recipe-card[data-id="' + id + '"]');
+    if (!card) return;
+    resetBrowseFiltersForRecommendation();
+    applyFilters();
+    var body = card.querySelector('.card-body');
+    var openBtn = card.querySelector('.card-open');
+    if (body && openBtn) {
+      body.hidden = false;
+      openBtn.setAttribute('aria-expanded', 'true');
+    }
+    setTimeout(function(){
+      card.scrollIntoView({behavior:'smooth', block:'start'});
+    }, 80);
+  }
+
+  $('#readingResult').addEventListener('click', function(e){
+    var rec = e.target.closest('.reading-rec-card');
+    if (rec) openRecommendedRecipe(rec.getAttribute('data-rec-id'));
+  });
 
   $('#readingForm').addEventListener('submit', function(e){
     e.preventDefault();
@@ -4973,14 +5240,8 @@ input, select, textarea {
     var h = document.createElement('h4'); h.textContent = advice.title; box.appendChild(h);
     var p = document.createElement('p'); p.textContent = advice.body; box.appendChild(p);
 
-    // The reading tool should act immediately, not ask the user to press another button.
-    // If the reading is invalid/low/in-range, clear any previous reading filter so stale suggestions do not stay active.
     if (advice.lane) {
       applyLane(advice.lane, advice.laneLabel);
-      var note = document.createElement('p');
-      note.textContent = 'Recipe list updated below.';
-      note.style.marginTop = '8px';
-      box.appendChild(note);
     } else {
       store.lane = null;
       store.laneLabel = null;
@@ -4988,7 +5249,11 @@ input, select, textarea {
       updateLaneBanner();
       applyFilters();
     }
+
+    renderRecommendations(box, recommendedCardsForAdvice(advice, type));
   });
+
+
 
   // ---------- Cook mode ----------
   var cookOverlay = $('#cookOverlay');
